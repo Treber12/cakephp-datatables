@@ -62,7 +62,7 @@ class DataTablesComponent extends Component
      * @param string $name
      * @return \DataTables\Controller\Component\DataTablesConfigComponent
      */
-    public function createConfig($name)
+    public function newTable($name)
     {
         return $this->DataTablesConfig->setDataTableConfig(Inflector::camelize($name), $this->defaultOptions);
     }

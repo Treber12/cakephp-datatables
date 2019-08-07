@@ -1,0 +1,4 @@
+*.code-workspace
+.vscode
+.sonarlint
+.vscode/sftp.json

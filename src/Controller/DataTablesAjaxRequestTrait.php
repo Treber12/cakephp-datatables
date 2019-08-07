@@ -24,6 +24,7 @@ use Cake\ORM\Query;
 use Cake\Utility\Inflector;
 use Cake\View\ViewBuilder;
 use DataTables\View\DataTablesView;
+use Cake\ORM\TableRegistry;
 
 /**
  * CakePHP DataTablesComponent
@@ -37,6 +38,9 @@ use DataTables\View\DataTablesView;
 trait DataTablesAjaxRequestTrait
 {
 
+    private $config = [];
+
+    private $params = [];
     /**
      * @var callable
      */
@@ -73,9 +77,9 @@ trait DataTablesAjaxRequestTrait
 
     /**
      * Ajax method to get data dynamically to the DataTables
-     * @param string $config
+     * @param string $this->config
      */
-    public function getDataTablesContent($config)
+    public function getDataTablesContent($configName)
     {
         if (!empty($this->dataTableBeforeAjaxFunction) and is_callable($this->dataTableBeforeAjaxFunction)) {
             call_user_func($this->dataTableBeforeAjaxFunction);
@@ -84,134 +88,49 @@ trait DataTablesAjaxRequestTrait
         if(Configure::read('debug') !== true) {
             $this->getRequest()->allowMethod('ajax');
         }
-        $configName = $config;
-        $config = $this->DataTables->getDataTableConfig($configName);
-        $params = $this->getRequest()->getQuery();
+        //set layout and global vars
+        $this->config = $this->DataTables->getDataTableConfig($configName);
+        $this->params = $this->getRequest()->getQuery();
         $this->viewBuilder()->setClassName(DataTablesView::class);
         $this->viewBuilder()->setTemplate(Inflector::underscore($configName));
 
-        if(empty($this->{$config['table']})) {
-            $this->loadModel($config['table']);
+        //if the table is not set set it
+        if(!isset($this->table)) {
+           $this->table = TableRegistry::get($this->config['table']);
         }
-
-        // searching all fields
-        $where = [];
-        if (!empty($params['search']['value'])) {
-            foreach ($config['columns'] as $column) {
-                if ($column['searchable'] == true) {
-                    $explodedColumnName = explode(".", $column['name']);
-                    if (count($explodedColumnName) == 2) {
-                        if ($explodedColumnName[0] === $this->{$config['table']}->getAlias()) {
-                            $columnType = !empty($this->{$config['table']}->getSchema()->getColumn($explodedColumnName[1])['type']) ? $this->{$config['table']}->getSchema()->getColumn($explodedColumnName[1])['type'] : 'string';
-                        } else {
-                            $columnType = !empty($this->{$config['table']}->{$explodedColumnName[0]}->getSchema()->getColumn($explodedColumnName[1])['type']) ? $this->{$config['table']}->getSchema()->getColumn($explodedColumnName[1])['type'] : 'string';
-                        }
-                    } else {
-                        $columnType = !empty($this->{$config['table']}->getSchema()->getColumn($column['name'])['type']) ? $this->{$config['table']}->getSchema()->getColumn($column['name'])['type'] : 'string';
-                    }
-                    switch ($columnType) {
-                        case "integer":
-                            if (is_numeric($params['search']['value'])) {
-                                $where['OR']["{$column['name']}"] = $params['search']['value'];
-                            }
-                            break;
-                        case "decimal":
-                            if (is_numeric($params['search']['value'])) {
-                                $where['OR']["{$column['name']}"] = $params['search']['value'];
-                            }
-                            break;
-                        case "string":
-                            $where['OR']["{$column['name']} like"] = "%{$params['search']['value']}%";
-                            break;
-                        case "text":
-                            $where['OR']["{$column['name']} like"] = "%{$params['search']['value']}%";
-                            break;
-                        case "boolean":
-                            $where['OR']["{$column['name']} like"] = "%{$params['search']['value']}%";
-                            break;
-                        case "datetime":
-                            $where['OR']["{$column['name']} like"] = "%{$params['search']['value']}%";
-                            break;
-                        default:
-                            $where['OR']["{$column['name']} like"] = "%{$params['search']['value']}%";
-                            break;
-                    }
-                }
-            }
+        if(isset($this->config['options']['filterByCompany']) && $this->config['options']['filterByCompany'] == false){
+            $this->table->filterByCompany = false;
         }
-
-        // searching individual field
-        foreach ($params['columns'] as $paramColumn) {
-            $columnSearch = $paramColumn['search']['value'];
-            if (!$columnSearch || !$paramColumn['searchable']) {
-                continue;
-            }
-
-            $explodedColumnName = explode(".", $paramColumn['name']);
-            if (count($explodedColumnName) == 2) {
-                if ($explodedColumnName[0] === $this->{$config['table']}->getAlias()) {
-                    $columnType = !empty($this->{$config['table']}->getSchema()->getColumn($explodedColumnName[1])['type']) ? $this->{$config['table']}->getSchema()->getColumn($explodedColumnName[1])['type'] : 'string';
-                } else {
-                    $columnType = !empty($this->{$config['table']}->{$explodedColumnName[0]}->getSchema()->getColumn($explodedColumnName[1])['type']) ? $this->{$config['table']}->getSchema()->getColumn($explodedColumnName[1])['type'] : 'string';
-                }
-            } else {
-                $columnType = !empty($this->{$config['table']}->getSchema()->getColumn($paramColumn['name'])['type']) ? $this->{$config['table']}->getSchema()->getColumn($paramColumn['name'])['type'] : 'string';
-            }
-            switch ($columnType) {
-                case "integer":
-                    if (is_numeric($params['search']['value'])) {
-                        $where[] = [$paramColumn['name'] => $columnSearch];
-                    }
-                    break;
-                case "decimal":
-                    if (is_numeric($params['search']['value'])) {
-                        $where[] = [$paramColumn['name'] => $columnSearch];
-                    }
-                    break;
-                case 'string':
-                    $where[] = ["{$paramColumn['name']} like" => "%$columnSearch%"];
-                    break;
-                default:
-                    $where[] = ["{$paramColumn['name']} like" => "%$columnSearch%"];
-                    break;
-            }
+        if(isset($this->config['options']['filterByTenantCompanies']) && $this->config['options']['filterByTenantCompanies'] == false){
+            $this->table->filterByTenantCompanies = false;
         }
-
-        $order = [];
-        if (!empty($params['order'])) {
-            foreach ($params['order'] as $item) {
-                $order[$config['columnsIndex'][$item['column']]] = $item['dir'];
-            }
-        }
-        if(!empty($order)) {
-            unset($config['queryOptions']['order']);
-        }
-        
-        foreach ($config['columns'] as $key => $item) {
-            if ($item['database'] == true) {
-                $select[] = $key;
-            }
-        }
-
-        if (!empty($config['databaseColumns'])) {
-            foreach ($config['databaseColumns'] as $key => $item) {
-                $select[] = $item;
-            }
+        if(isset($this->config['options']['filterByTenant']) && $this->config['options']['filterByTenant'] == false){
+            $this->table->filterByTenant = false;
         }
 
         /** @var array $select */
         /** @var Query $results */
-        $results = $this->{$config['table']}->find($config['finder'], $config['queryOptions'])
-            ->select($select)
-            ->where($where)
-            ->limit($params['length'])
-            ->offset($params['start'])
-            ->order($order);
+        $results = $this->table->find($this->config['finder'], $this->config['queryOptions'])
+            ->where($this->config['where'], $this->config['cast'])
+            ->contain($this->config['contain'])
+            ->limit($this->params['length'])
+            ->offset($this->params['start'])
+            ->order($this->parseOrder());
+        if($this->config['selectAll'] && $select = $this->parseSelect()){
+            $results = $results->select($select);
+        }
 
+        $recordsTotal = (int) $results->count();
+
+        if($where = $this->parseWhere()){
+            $results = $results->where($where);
+        }
+
+        $recordsFiltered = (int) $results->count();
         $resultInfo = [
-            'draw' => (int)$params['draw'],
-            'recordsTotal' => (int)$this->{$config['table']}->find('all', $config['queryOptions'])->count(),
-            'recordsFiltered' => (int)$results->count()
+            'draw' => (int)$this->params['draw'],
+            'recordsTotal' => $recordsTotal,
+            'recordsFiltered' => $recordsFiltered
         ];
 
         $this->set([
@@ -222,6 +141,122 @@ trait DataTablesAjaxRequestTrait
         if (!empty($this->dataTableAfterAjaxFunction) and is_callable($this->dataTableAfterAjaxFunction)) {
             call_user_func($this->dataTableAfterAjaxFunction);
         }
+    }
+
+    public function parseSelect(){
+        $select = [];
+        if($options['selectAll'] == false){
+            foreach ($this->config['columns'] as $key => $item) {
+                if ($item['database'] == true) {
+                    $select[] = $key;
+                }
+            }
+    
+            if (!empty($this->config['databaseColumns'])) {
+                foreach ($this->config['databaseColumns'] as $key => $item) {
+                    $select[] = $item;
+                }
+            }
+        }
+
+        return array_merge($select, $options['select']);
+    }
+
+    public function parseOrder(){
+        $order = [];
+
+        if (!empty($this->params['order'])) {
+            foreach ($this->params['order'] as $item) {
+                $order[$this->config['columnsIndex'][$item['column']]] = $item['dir'];
+            }
+        }
+        if(!empty($order)) {
+            unset($this->config['queryOptions']['order']);
+        }
+
+        return $order;
+    }
+
+    public function parseWhere(){
+        $where = [];
+        if (!empty($this->params['search']['value'])) {
+            foreach ($this->config['columns'] as $column) {
+                if ($column['searchable'] == true) {
+                    $explodedColumnName = explode(".", $column['name']);
+                    if (count($explodedColumnName) == 2) {
+                        if ($explodedColumnName[0] === $this->table->getAlias()) {
+                            $columnType = !empty($this->table->getSchema()->getColumn($explodedColumnName[1])['type']) ? $this->table->getSchema()->getColumn($explodedColumnName[1])['type'] : 'string';
+                        } else {
+                            $columnType = !empty($this->table->{$explodedColumnName[0]}->getSchema()->getColumn($explodedColumnName[1])['type']) ? $this->table->getSchema()->getColumn($explodedColumnName[1])['type'] : 'string';
+                        }
+                    } else {
+                        $columnType = !empty($this->table->getSchema()->getColumn($column['name'])['type']) ? $this->table->getSchema()->getColumn($column['name'])['type'] : 'string';
+                    }
+               
+                    switch ($columnType) {
+                        case "integer":
+                            if (is_numeric($this->params['search']['value'])) {
+                                $where['OR']["{$column['name']}"] = $this->params['search']['value'];
+                            }
+                            break;
+                        case "boolean":
+                           
+                            break;
+                        case "decimal":
+                            if (is_numeric($this->params['search']['value'])) {
+                                $where['OR']["{$column['name']}"] = $this->params['search']['value'];
+                            }
+                            break;
+                        case "string":
+                            $where['OR']["{$column['name']} like"] = "%{$this->params['search']['value']}%";
+                            break;
+                        case "text":
+                            $where['OR']["{$column['name']} like"] = "%{$this->params['search']['value']}%";
+                            break;
+                        case "datetime":
+                            $where['OR']["{$column['name']} like"] = "%{$this->params['search']['value']}%";
+                            break;
+                        default:
+                            $where['OR']["{$column['name']} like"] = "%{$this->params['search']['value']}%";
+                            break;
+                    }
+                }
+            }
+        }
+        // searching individual field
+        foreach ($this->params['columns'] as $paramColumn) {
+            $columnSearch = $paramColumn['search']['value'];
+            if (!$columnSearch || !$paramColumn['searchable']) {
+                continue;
+            }
+
+            $explodedColumnName = explode(".", $paramColumn['name']);
+            if (count($explodedColumnName) == 2) {
+                if ($explodedColumnName[0] === $this->table->getAlias()) {
+                    $columnType = !empty($this->table->getSchema()->getColumn($explodedColumnName[1])['type']) ? $this->table->getSchema()->getColumn($explodedColumnName[1])['type'] : 'string';
+                } else {
+                    $columnType = !empty($this->table->{$explodedColumnName[0]}->getSchema()->getColumn($explodedColumnName[1])['type']) ? $this->table->getSchema()->getColumn($explodedColumnName[1])['type'] : 'string';
+                }
+            } else {
+                $columnType = !empty($this->table->getSchema()->getColumn($paramColumn['name'])['type']) ? $this->table->getSchema()->getColumn($paramColumn['name'])['type'] : 'string';
+            }
+            switch ($columnType) {
+                case "integer":
+                    if (is_numeric($this->params['search']['value'])) {
+                        $where[] = [$paramColumn['name'] => $columnSearch];
+                    }
+                    break;
+                case "decimal":
+                    if (is_numeric($this->params['search']['value'])) {
+                        $where[] = [$paramColumn['name'] => $columnSearch];
+                    }
+                    break;
+                case 'string':
+                    $where[] = ["{$paramColumn['name']} like" => "%$columnSearch%"];
+                    break;
+            }
+        }
+        return $where;
     }
 
 }

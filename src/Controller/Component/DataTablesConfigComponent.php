@@ -72,10 +72,18 @@ class DataTablesConfigComponent extends Component
         $this->currentConfig = $name;
         $this->dataTableConfig[$name]['id'] = 'dt' . $name;
         $this->dataTableConfig[$name]['table'] = $name;
+
         $this->dataTableConfig[$name]['queryOptions'] = [];
+
+        $this->dataTableConfig[$name]['select'] = [];
+        $this->dataTableConfig[$name]['contain'] = [];
+        $this->dataTableConfig[$name]['where'] = [];
+        $this->dataTableConfig[$name]['joins'] = [];
+
         $this->dataTableConfig[$name]['options'] = $this->defaultOptions;
         $this->dataTableConfig[$name]['finder'] = "all";
         $this->dataTableConfig[$name]['trait'] = "DataTablesAjaxRequestTrait";
+
         $urls = [];
         /** @var Controller $controller */
         $controller = $this->getController();
@@ -152,8 +160,12 @@ class DataTablesConfigComponent extends Component
         }
         $options += [
             'label' => $name,
+            'selectAll'=>true,
             'database' => true,
             'searchable' => true,
+            'filterByTenant' => true,
+            'filterByCompany' => true,
+            'filterByTenantCompanies' => true,
             'orderable' => true,
             'className' => null,
             'orderDataType' => 'dom-text',
@@ -213,6 +225,31 @@ class DataTablesConfigComponent extends Component
     public function queryOptions(array $options = [])
     {
         $this->dataTableConfig[$this->currentConfig]['queryOptions'] = $options;
+        return $this;
+    }
+
+    public function select(array $options = [])
+    {
+        $this->dataTableConfig[$this->currentConfig]['select'] = $options;
+        return $this;
+    }
+
+    public function where(array $options = [], array $cast = [])
+    {
+        $this->dataTableConfig[$this->currentConfig]['where'] = $options;
+        $this->dataTableConfig[$this->currentConfig]['cast'] = $cast;
+        return $this;
+    }
+
+    public function contain(array $options = [])
+    {
+        $this->dataTableConfig[$this->currentConfig]['contain'] = $options;
+        return $this;
+    }
+
+    public function joins(array $options = [])
+    {
+        $this->dataTableConfig[$this->currentConfig]['joins'] = $options;
         return $this;
     }
 
