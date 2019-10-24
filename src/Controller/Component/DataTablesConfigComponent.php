@@ -74,9 +74,11 @@ class DataTablesConfigComponent extends Component
         $this->dataTableConfig[$name]['table'] = $name;
 
         $this->dataTableConfig[$name]['queryOptions'] = [];
-
+        $this->dataTableConfig[$name]['selectAll'] = true;
         $this->dataTableConfig[$name]['select'] = [];
         $this->dataTableConfig[$name]['contain'] = [];
+        $this->dataTableConfig[$name]['cast'] = [];
+        $this->dataTableConfig[$name]['order'] = [];
         $this->dataTableConfig[$name]['where'] = [];
         $this->dataTableConfig[$name]['joins'] = [];
 
@@ -160,7 +162,6 @@ class DataTablesConfigComponent extends Component
         }
         $options += [
             'label' => $name,
-            'selectAll'=>true,
             'database' => true,
             'searchable' => true,
             'filterByTenant' => true,
@@ -214,6 +215,12 @@ class DataTablesConfigComponent extends Component
     {
         $this->dataTableConfig[$this->currentConfig]['options'] = $options;
         $this->dataTableConfig[$this->currentConfig]['options'] += $this->defaultOptions;
+        return $this;
+    }
+    public function order(array $options = [])
+    {
+        $this->dataTableConfig[$this->currentConfig]['order'] = $options;
+        $this->dataTableConfig[$this->currentConfig]['order'] += $this->defaultOptions;
         return $this;
     }
 

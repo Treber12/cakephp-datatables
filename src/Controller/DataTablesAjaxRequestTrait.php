@@ -107,7 +107,6 @@ trait DataTablesAjaxRequestTrait
         if(isset($this->config['options']['filterByTenant']) && $this->config['options']['filterByTenant'] == false){
             $this->table->filterByTenant = false;
         }
-
         /** @var array $select */
         /** @var Query $results */
         $results = $this->table->find($this->config['finder'], $this->config['queryOptions'])
@@ -132,7 +131,6 @@ trait DataTablesAjaxRequestTrait
             'recordsTotal' => $recordsTotal,
             'recordsFiltered' => $recordsFiltered
         ];
-
         $this->set([
             'results' => $results,
             'resultInfo' => $resultInfo,
@@ -145,7 +143,7 @@ trait DataTablesAjaxRequestTrait
 
     public function parseSelect(){
         $select = [];
-        if($options['selectAll'] == false){
+        if($this->config['selectAll'] == false){
             foreach ($this->config['columns'] as $key => $item) {
                 if ($item['database'] == true) {
                     $select[] = $key;
@@ -159,7 +157,7 @@ trait DataTablesAjaxRequestTrait
             }
         }
 
-        return array_merge($select, $options['select']);
+        return array_merge($select, $this->config['select']);
     }
 
     public function parseOrder(){
@@ -174,7 +172,7 @@ trait DataTablesAjaxRequestTrait
             unset($this->config['queryOptions']['order']);
         }
 
-        return $order;
+        return array_merge($order, $this->config['order']);
     }
 
     public function parseWhere(){
